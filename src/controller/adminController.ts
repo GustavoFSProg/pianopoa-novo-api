@@ -1,17 +1,21 @@
 import { Request, Response } from 'express'
 import adminModel from '../models/adminMdel'
 import md5 from 'md5'
-import { generateToken } from '../token'
+import { generateToken, verifyToken } from '../token'
 
 async function register(req: Request, res: Response) {
   try {
+    const data = [req.body.email, req.body.password]
+
     await adminModel.create({
       name: req.body.name,
       email: req.body.email,
       password: md5(req.body.password, process.env.SECRET as string & { asBytes: true }),
     })
 
-    return res.status(201).json({ msg: 'Admin cadastrado com sucesso!' })
+    const token = await generateToken(data)
+
+    return res.status(201).json({ msg: 'Admin cadastrado com sucesso!', token })
   } catch (error) {
     return res.status(201).json({ msg: 'ERRO!!!', error })
   }
@@ -55,6 +59,17 @@ async function Login(req: Request, res: Response) {
   }
 }
 
+async function isAuthorized(req: Request, res: Response, next: () => any) {
+  const token = req.body.token || req.headers['x-access-token']
+
+  if (!token) return res.status(401).send({ error: 'Not authorized' })
+
+  const error: any = await verifyToken(token)
+
+  if (error) return res.status(401).send({ error: 'Invalid token' })
+  // req.body.currentUser = await getCurrentUser(decode.email)
+  return next()
+}
 // async function Auth(){
 //   try {
 
@@ -63,4 +78,4 @@ async function Login(req: Request, res: Response) {
 //   }
 // }
 
-export default { register, getAll, deleteAll, Login }
+export default { register, isAuthorized, getAll, deleteAll, Login }
